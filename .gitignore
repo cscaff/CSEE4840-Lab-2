@@ -1,6 +1,8 @@
 # Ignore local changes to these files (use git update-index --skip-worktree <file>)
 Makefile
 fbputchar.c
+usbkeyboard.c
+lab2.c
 
 # Build artifacts
 *.o
