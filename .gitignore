@@ -2,9 +2,9 @@
 Makefile
 fbputchar.c
 usbkeyboard.c
-lab2.c
 
 # Build artifacts
 build/*.o
 build/lab2
 build/lab2.tar.gz
+build/*.md
