@@ -60,7 +60,7 @@ int main()
   char keystate[12];
 
   // Internal Buffer
-  char send_buffer[128];
+  char send_buffer[BUFFER_SIZE];
   int send_len = 0;
 
   // Opens Frame Buffer
@@ -144,7 +144,7 @@ int main()
             printf("Message Send Failed. Error: %zd\n", sent);
           send_len = 0; // Reset Buffer
         // Add char to send buffer if it exists and the buffer is not full.
-        } else if (ch && send_len + 1 < 128) { 
+        } else if (ch && send_len + 1 < BUFFER_SIZE) { 
           send_buffer[send_len++] = ch;
           // Convert to C-String
           char tmp[2] = {ch, '\0'};
