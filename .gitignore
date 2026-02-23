@@ -1,0 +1,8 @@
+# Ignore local changes to these files (use git update-index --skip-worktree <file>)
+Makefile
+fbputchar.c
+
+# Build artifacts
+*.o
+lab2
+lab2.tar.gz
