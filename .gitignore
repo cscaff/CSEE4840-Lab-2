@@ -5,6 +5,6 @@ usbkeyboard.c
 lab2.c
 
 # Build artifacts
-*.o
-lab2
-lab2.tar.gz
+build/*.o
+build/lab2
+build/lab2.tar.gz
