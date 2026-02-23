@@ -2,7 +2,8 @@
  *
  * CSEE 4840 Lab 2 for 2019
  *
- * Name/UNI: Please Changeto Yourname (pcy2301)
+ * By: Nicola Paparella, Connor Marvin, Christian Scaff
+ * Uni: cm4662, np2953, cts2148
  */
 #include "fbputchar.h"
 #include <stdio.h>
