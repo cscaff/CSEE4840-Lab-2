@@ -15,7 +15,7 @@
 #include "usbkeyboard.h"
 #include <pthread.h>
 
-extern char hidtoascii(uint8_t keycode, uint8_t modifiers);
+// extern char hidtoascii(uint8_t keycode, uint8_t modifiers); // THIS IS A STUB FOR MY OWN TESTING ON MY LAPTOP. FUNCTION DOES NOT EXIST: TODO IMPLIMENT!
 
 /* Update SERVER_HOST to be the IP address of
  * the chat server you are connecting to
@@ -47,11 +47,13 @@ uint8_t endpoint_address;
 
 pthread_t network_thread;
 void *network_thread_f(void *);
-void access_frame_buffer(const char *s, int row, int col);
+void reset_rows(int row, int count);
+void init_frame_buffer();
+int send_message(char* buffer, int buffer_len);
 
 int main()
 {
-  int err, col;
+  int err, col, row;
 
   struct sockaddr_in serv_addr;
 
@@ -68,16 +70,10 @@ int main()
   if ((err = fbopen()) != 0) {
     fprintf(stderr, "Error: Could not open framebuffer: %d\n", err);
     exit(1);
+  } else {
+    // Initializes Frame Buffer
+    init_frame_buffer();
   }
-
-  /* Draw rows of asterisks across the top and bottom of the screen */
-  for (col = 0 ; col < 64 ; col++) {
-    fbputchar('*', 0, col);
-    fbputchar('*', 23, col);
-  }
-
-  // Prints message to frame buffer at row 4, column 10.
-  fbputs("Hello CSEE 4840 World!", 4, 10);
 
   /* Open the keyboard */
   if ( (keyboard = openkeyboard(&endpoint_address)) == NULL ) {
@@ -133,22 +129,23 @@ int main()
         printf("%s\n", keystate);
 
         // Temp HID to ASCII:
-        char ch = 'a'; // TODO: Implement a 'hidtoascii(packet.keycode[0], packet.modifiers);'
+        // char ch = hidtoascii(packet.keycode[0], packet.modifiers); // TODO: NEED TO IMPLEMENT THIS FUNCTION! THIS IS A STUB FOR TESTING OTHER FUNCTIONS ON MY MAC.
 
         // Send to Socket if "Enter/Return" pressed.
         if (packet.keycode[0] == 0x28) {
-          send_buffer[send_len++] = '\n';
-          send_buffer[send_len]   = '\0'; // Transforms to C-String.
-          ssize_t sent = write(sockfd, send_buffer, send_len);
-          if (sent < 0)
-            printf("Message Send Failed. Error: %zd\n", sent);
-          send_len = 0; // Reset Buffer
-        // Add char to send buffer if it exists and the buffer is not full.
+          send_len = send_message(send_buffer, send_len);
         } else if (ch && send_len + 1 < BUFFER_SIZE) { 
+          // Add char to buffer if it exists and the buffer is not full.
           send_buffer[send_len++] = ch;
-          // Convert to C-String
-          char tmp[2] = {ch, '\0'};
-          access_frame_buffer(tmp, 6, send_len - 1);
+
+          // Get row and col from buffer len to wrap text to next line.
+          row = FB_ROWS - 3 + ((send_len - 1) / FB_COLS);
+          col = (send_len - 1) % FB_COLS;
+
+          // MUTEX THREAD Gaurd 
+          pthread_mutex_lock(&fb_mutex);
+          fbputchar(ch, row, col);
+          pthread_mutex_unlock(&fb_mutex);
         }
         if (packet.keycode[0] == 0x29) { /* ESC pressed? */
 	        break;
@@ -174,24 +171,106 @@ void *network_thread_f(void *ignored)
   
   char recvBuf[BUFFER_SIZE];
   int n;
+  int row = 8;
+
   /* Receive data */
   while ( (n = read(sockfd, &recvBuf, BUFFER_SIZE - 1)) > 0 ) {
     recvBuf[n] = '\0';
     printf("%s", recvBuf);
-    // Frame Buffer Access From Network
-    access_frame_buffer(recvBuf, 8, 0);
+
+    // Determine how many rows to output read buffer.
+    int row_count = (n + FB_COLS - 1) / FB_COLS;
+
+   for (int i = 0; i < row_count; i++) {
+      // Reset row before writing to it.
+      reset_rows(row + i, 1);
+      // MUTEX THREAD Guard
+      pthread_mutex_lock(&fb_mutex);
+      fbputs(&recvBuf[i * FB_COLS], row + i, 0); // Only write fraction of buffer that fits on the current row.
+      pthread_mutex_unlock(&fb_mutex);
+   }
+   row += row_count;  // advance past the rows we just used in our last write.
+
+   if (row >= FB_ROWS - 4)
+       row = 8;  // wrap back to top of message area (FB_ROWS - 4 is the divide between the receipt and send regions / Row 8 is the top).
   }
 
   return NULL;
 }
 
-void access_frame_buffer(const char *s, int row, int col) {
+
+void reset_rows(int row, int count) {
+  // Reset number of rows starting at `row`.
   pthread_mutex_lock(&fb_mutex);
-  fbputs(s, row, col);
+  for (int i = 0; i < count; i++) {
+    for (int col = 0; col < FB_COLS; col++) {
+      fbputchar(' ', row + i, col);
+    }
+  }
   pthread_mutex_unlock(&fb_mutex);
+}
+
+
+void init_frame_buffer() {
+  int row, col;
+  /* Reset Screen/Frame Buffer */
+  for (col = 0; col < FB_COLS; col++) {
+    for (row = 0; row < FB_ROWS; row++) {
+      fbputchar(' ', row, col);
+    }
+  }
+
+  /* Draw rows of asterisks across the top and bottom of the screen */
+  for (col = 0 ; col < 64 ; col++) {
+    fbputchar('*', 0, col);
+    fbputchar('*', FB_ROWS - 1, col);
+  }
+
+  /* Split the Screen into two parts w/ line 2 rows above bottom border. */
+  for (col = 0 ; col < FB_COLS; col += 2) {
+    fbputchar('-', FB_ROWS - 4, col);
+  }
+
+  // Prints message to frame buffer at row 4, column 10.
+  fbputs("Hello CSEE 4840 World!", 4, 10);
+}
+
+int send_message(char* buffer, int buffer_len) {
+  // Transforms to C-String.
+  buffer[buffer_len++] = '\n';
+  buffer[buffer_len]   = '\0';
+
+  // Send data to socket.
+  ssize_t sent = write(sockfd, buffer, buffer_len);
+
+  // Error Handeling
+  if (sent < 0)
+    printf("Message Send Failed. Error: %zd\n", sent);
+
+  // Reset Buffer
+  int reset_cnt = (buffer_len + FB_COLS - 1) / FB_COLS;
+  reset_rows(FB_ROWS - 3, reset_cnt);
+
+  return 0;
 }
 
 // =========== NOTES ===========
 // The shared resouce is the frame buffer and the socket.
-// User needs to access frame buffer and socket.
-// Network needs to access socket and frame buffer.
+// User needs to access frame buffer and write socket.
+// Network needs to access read socket and frame buffer.
+
+// Threading is done.
+// Keyboard Mapping needs to be implmented. I used an LLM to make a fake simulation with std C I/O just for testing my portion of the lab.
+// Frame buffer is half done.
+// I made it:
+//  1. Clear the screen when the program starts
+//  2. Split the screen into two parts with a horizontal line. Have the user enter text on the bottom two rows; use the rest to record what s/he and other users send.
+//  3. When a packet arrives, print its contents in the “receive” region. Don’t forget to wrap long messages across multiple lines.
+//  4. When printing reaches the bottom of the area, you may either start again at the top, or scroll the entry region of the screen. (Mine starts from the top but does not clear).
+// STILL TO DO:
+// – Implement a reasonable text-editing system for the bottom of the screen. Have
+// input from the keyboard display characters there and allow users to erase
+// unwanted characters and send the message with return. Clear the bottom area
+// when a message is sent.
+// – Display a cursor where the user is typing. This could be a vertical line, an
+// underline, or a white box.
