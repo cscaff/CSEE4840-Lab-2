@@ -154,6 +154,13 @@ void *network_thread_f(void *ignored)
   int n;
   int row = 8;
 
+  if (row == 8) {
+      // Rest entire input feed.
+      pthread_mutex_lock(&fb_mutex);
+      reset_rows(8, 14);
+      pthread_mutex_unlock(&fb_mutex);
+  }
+
   /* Receive data */
   while ( (n = read(sockfd, &recvBuf, BUFFER_SIZE - 1)) > 0 ) {
     recvBuf[n] = '\0';
@@ -174,10 +181,6 @@ void *network_thread_f(void *ignored)
 
    if (row >= FB_ROWS - 4) {
       printf("CURR ROW: %d\n", row);
-      // Rest entire input feed.
-      pthread_mutex_lock(&fb_mutex);
-      reset_rows(8, 14);
-      pthread_mutex_unlock(&fb_mutex);
       row = 8;  // wrap back to top of message area (FB_ROWS - 4 is the divide between the receipt and send regions / Row 8 is the top).
    }
 }
