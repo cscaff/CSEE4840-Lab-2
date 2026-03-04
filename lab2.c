@@ -183,7 +183,7 @@ static void input_send_and_clear(void)
 {
   if (sockfd >= 0) {
     /* Send exactly what was typed w/ newline appended */
-    input_line[input_len] = '\n';
+    input_line[input_len] = ' ';
     if (input_len > 0) {
       ssize_t sent = write(sockfd, input_line, input_len + 1);
       if (sent < 0) {
