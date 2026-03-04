@@ -220,14 +220,6 @@ void *network_thread_f(void *ignored)
     recvBuf[n] = '\0';
     printf("%s", recvBuf);
 
-    if (row == 8) {
-      // Rest entire input feed.
-      pthread_mutex_lock(&fb_mutex);
-      reset_rows(8, 12);
-      pthread_mutex_unlock(&fb_mutex);
-    }
-
-
     // Figure out indent: if the line begins with "<...> " then indent continuations.
     int indent = 0;
     if (recvBuf[0] == '<') {
@@ -263,6 +255,13 @@ void *network_thread_f(void *ignored)
     // If this message would overflow into the dashed-line/input region, wrap to top.
     if (row + row_count >= FB_ROWS - 4) {
       row = 8;
+    }
+
+    // Clear the message area when wrapping back to the top.
+    if (row == 8) {
+      pthread_mutex_lock(&fb_mutex);
+      reset_rows(8, 12);
+      pthread_mutex_unlock(&fb_mutex);
     }
 
     // Print rows
