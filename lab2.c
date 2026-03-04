@@ -16,6 +16,9 @@
 #include <pthread.h>
 
 
+#define FB_ROWS 24
+#define FB_COLS 64
+
 /* Update SERVER_HOST to be the IP address of
  * the chat server you are connecting to
  */
