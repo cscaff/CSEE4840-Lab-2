@@ -271,7 +271,7 @@ void *network_thread_f(void *ignored)
 
       reset_rows(row + i, 1);
 
-      int col_start = (i == 0) ? 0 : 4;
+      int col_start = (i == 0) ? 0 : indent;
       int width     = (i == 0) ? first_width : cont_width;
 
       // Build substring for this row
