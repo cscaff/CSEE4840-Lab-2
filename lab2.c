@@ -179,7 +179,8 @@ void *network_thread_f(void *ignored)
       reset_rows(8, (INPUT_START_ROW - 10));
       pthread_mutex_unlock(&fb_mutex);
       row = 8;  // wrap back to top of message area (FB_ROWS - 4 is the divide between the receipt and send regions / Row 8 is the top).
-  }
+   }
+}
 
   return NULL;
 }
