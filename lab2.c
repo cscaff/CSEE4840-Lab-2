@@ -276,6 +276,9 @@ void *network_thread_f(void *ignored)
       int col_start = (i == 0) ? 0 : indent;
       int width     = (i == 0) ? first_width : cont_width;
 
+      // DEBUG
+      printf("ROW %d: col_start=%d width=%d offset=%d remaining=%d\n", row + i, col_start, width, offset, n - offset);
+
       // Build substring for this row
       char line[FB_COLS + 1];
       int len = n - offset;
