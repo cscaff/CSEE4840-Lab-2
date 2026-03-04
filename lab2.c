@@ -173,7 +173,10 @@ void *network_thread_f(void *ignored)
    row += row_count;  // advance past the rows we just used in our last write.
 
    if (row >= FB_ROWS - 4)
-       row = 8;  // wrap back to top of message area (FB_ROWS - 4 is the divide between the receipt and send regions / Row 8 is the top).
+      // Rest entire input feed.
+      pthread_mutex_lock(&fb_mutex);
+      reset_rows(8, (INPUT_START_ROW - 10));
+      pthread_mutex_unlock(&fb_mutex);
   }
 
   return NULL;
