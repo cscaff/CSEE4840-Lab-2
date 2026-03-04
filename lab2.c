@@ -219,6 +219,8 @@ void *network_thread_f(void *ignored)
   while ( (n = read(sockfd, &recvBuf, BUFFER_SIZE - 1)) > 0 ) {
     recvBuf[n] = '\0';
     printf("%s", recvBuf);
+    while (n > 0 && (recvBuf[n-1] == '\n' || recvBuf[n-1] == '\r'))
+        recvBuf[--n] = '\0';
 
     // Figure out indent: if the line begins with "<...> " then indent continuations.
     int indent = 0;
@@ -282,21 +284,12 @@ void *network_thread_f(void *ignored)
 
       memcpy(line, &recvBuf[offset], len);
 
-      // Stop at newline if it exists in this chunk (don't turn it into spaces)
-      for (int k = 0; k < len; k++) {
-        if (line[k] == '\n' || line[k] == '\r') {
-          line[k] = '\0';
-          len = k;
-          break;
-        }
-      }
-
       line[len] = '\0';
       fbputs(line, row + i, col_start);
 
       pthread_mutex_unlock(&fb_mutex);
 
-      offset += len + 1; /* +1 to skip past the newline/delimiter */
+      offset += len;
       if (offset >= n) break;
     }
 
