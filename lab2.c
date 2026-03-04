@@ -15,7 +15,6 @@
 #include "usbkeyboard.h"
 #include <pthread.h>
 
-// extern char hidtoascii(uint8_t keycode, uint8_t modifiers); // THIS IS A STUB FOR MY OWN TESTING ON MY LAPTOP. FUNCTION DOES NOT EXIST: TODO IMPLIMENT!
 
 /* Update SERVER_HOST to be the IP address of
  * the chat server you are connecting to
@@ -37,8 +36,10 @@
 #define HID_KEY_DOWN       0x51
 #define HID_KEY_UP         0x52
 
-#define INPUT_START_ROW (FB_ROWS - 3)  /* row 21, just below dashed divider */
-#define INPUT_MAX_ROWS 2               /* rows 21 and 22 available for input */
+/* row 21, just below dashed divider */
+#define INPUT_START_ROW (FB_ROWS - 3)  
+/* rows 21 and 22 available for input */
+#define INPUT_MAX_ROWS 2               
 
 /* Keep an input buffer for what the user is typing */
 static char input_line[BUFFER_SIZE];
@@ -110,6 +111,7 @@ static void render_input_line(void)
 {
   int i, row, col;
 
+  // GUARD FRAME BUFFER
   pthread_mutex_lock(&fb_mutex);
 
   /* Clear both input rows */
@@ -125,7 +127,7 @@ static void render_input_line(void)
     fbputchar(input_line[i], row, col);
   }
 
-  /* Draw cursor */
+  /* Draw cursor w/ word wrapping too. */
   if (cursor_pos >= 0 && cursor_pos <= input_len) {
     row = INPUT_START_ROW + cursor_pos / FB_COLS;
     col = cursor_pos % FB_COLS;
@@ -133,6 +135,7 @@ static void render_input_line(void)
       fbputchar('_', row, col);
   }
 
+  // GUARD FRAME BUFFER
   pthread_mutex_unlock(&fb_mutex);
 }
 
@@ -173,25 +176,6 @@ void *network_thread_f(void *ignored)
   return NULL;
 }
 
-// int send_message(char* buffer, int buffer_len) {
-//   // Transforms to C-String.
-//   buffer[buffer_len++] = '\n';
-//   buffer[buffer_len]   = '\0';
-
-//   // Send data to socket.
-//   ssize_t sent = write(sockfd, buffer, buffer_len);
-
-//   // Error Handeling
-//   if (sent < 0)
-//     printf("Message Send Failed. Error: %zd\n", sent);
-
-//   // Reset Buffer
-//   int reset_cnt = (buffer_len + FB_COLS - 1) / FB_COLS;
-//   reset_rows(FB_ROWS - 3, reset_cnt);
-
-//   return 0;
-// }
-
 /* Send the current input line to the server (followed by newline),
  * then clear the input line.
  */
@@ -203,7 +187,7 @@ static void input_send_and_clear(void)
     if (input_len > 0) {
       ssize_t sent = write(sockfd, input_line, input_len + 1);
       if (sent < 0) {
-        // printf("Message Send Failed. Error: %zd\n", sent);
+        printf("Message Send Failed. Error: %zd\n", sent);
       }
     }
   }
@@ -524,24 +508,3 @@ int main()
 
   return 0;
 }
-
-// =========== NOTES ===========
-// The shared resouce is the frame buffer and the socket.
-// User needs to access frame buffer and write socket.
-// Network needs to access read socket and frame buffer.
-
-// Threading is done.
-// Keyboard Mapping needs to be implmented. I used an LLM to make a fake simulation with std C I/O just for testing my portion of the lab.
-// Frame buffer is half done.
-// I made it:
-//  1. Clear the screen when the program starts
-//  2. Split the screen into two parts with a horizontal line. Have the user enter text on the bottom two rows; use the rest to record what s/he and other users send.
-//  3. When a packet arrives, print its contents in the “receive” region. Don’t forget to wrap long messages across multiple lines.
-//  4. When printing reaches the bottom of the area, you may either start again at the top, or scroll the entry region of the screen. (Mine starts from the top but does not clear).
-// STILL TO DO:
-// – Implement a reasonable text-editing system for the bottom of the screen. Have
-// input from the keyboard display characters there and allow users to erase
-// unwanted characters and send the message with return. Clear the bottom area
-// when a message is sent.
-// – Display a cursor where the user is typing. This could be a vertical line, an
-// underline, or a white box.
