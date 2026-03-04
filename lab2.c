@@ -159,7 +159,7 @@ void *network_thread_f(void *ignored)
     if (row == 8) {
       // Rest entire input feed.
       pthread_mutex_lock(&fb_mutex);
-      reset_rows(8, 12);
+      reset_rows(9, 12);
       pthread_mutex_unlock(&fb_mutex);
     }
 
