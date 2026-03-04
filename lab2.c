@@ -227,7 +227,7 @@ void *network_thread_f(void *ignored)
       if (gt != NULL) {
         indent = (int)((gt - recvBuf) + 2); // "> " (space after >)
         if (indent < 0) indent = 0;
-        if (indent > FB_COLS - 1) indent = 4;
+        if (indent > FB_COLS - 1) indent = FB_COLS - 1;
       }
     }
 
@@ -271,7 +271,7 @@ void *network_thread_f(void *ignored)
 
       reset_rows(row + i, 1);
 
-      int col_start = (i == 0) ? 0 : indent;
+      int col_start = (i == 0) ? 0 : 4;
       int width     = (i == 0) ? first_width : cont_width;
 
       // Build substring for this row
