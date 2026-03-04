@@ -156,7 +156,7 @@ void *network_thread_f(void *ignored)
 
   /* Receive data */
   while ( (n = read(sockfd, &recvBuf, BUFFER_SIZE - 1)) > 0 ) {
-    recvBuf[n] = '\0';
+    recvBuf[n] = ' '; // '\0';
     printf("%s", recvBuf);
 
     // Determine how many rows to output read buffer.
