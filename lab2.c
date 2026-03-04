@@ -172,7 +172,7 @@ void *network_thread_f(void *ignored)
    }
    row += row_count;  // advance past the rows we just used in our last write.
 
-   if (row >= FB_ROWS - 4)
+   if (row >= FB_ROWS - 4) {
       printf("CURR ROW: %d\n", row);
       // Rest entire input feed.
       pthread_mutex_lock(&fb_mutex);
