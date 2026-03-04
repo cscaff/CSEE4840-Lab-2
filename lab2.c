@@ -144,71 +144,163 @@ static void render_input_line(void)
 
 // ================== NETWORKING ==================
 
+// void *network_thread_f(void *ignored)
+// {
+//   /* network_thread_f
+//      Receives data from the network, leaving the main program thread
+//      to handle the USB keyboard. */
+  
+//   char recvBuf[BUFFER_SIZE];
+//   int n;
+//   int row = 8;
+
+//   /* Receive data */
+//   while ( (n = read(sockfd, &recvBuf, BUFFER_SIZE - 1)) > 0 ) {
+//     if (row == 8) {
+//       // Rest entire input feed.
+//       pthread_mutex_lock(&fb_mutex);
+//       reset_rows(8, 12);
+//       pthread_mutex_unlock(&fb_mutex);
+//     }
+
+//     recvBuf[n] = '\0';
+//     printf("%s", recvBuf);
+
+//     // Determine how many rows to output read buffer.
+//     int row_count = (n + FB_COLS - 1) / FB_COLS;
+
+//    for (int i = 0; i < row_count; i++) {
+//       // MUTEX THREAD Guard
+//       pthread_mutex_lock(&fb_mutex);
+//       // Reset row before writing to it.
+//       reset_rows(row + i, 1);
+//       fbputs(&recvBuf[i * FB_COLS], row + i, 0); // Only write fraction of buffer that fits on the current row.
+//       pthread_mutex_unlock(&fb_mutex);
+//    }
+//    row += row_count;  // advance past the rows we just used in our last write.
+
+//    if (row >= FB_ROWS - 4) {
+//       printf("CURR ROW: %d\n", row);
+//       row = 8;  // wrap back to top of message area (FB_ROWS - 4 is the divide between the receipt and send regions / Row 8 is the top).
+//    }
+// }
+
+//   return NULL;
+// }
+
+// /* Send the current input line to the server (followed by newline),
+//  * then clear the input line.
+//  */
+// static void input_send_and_clear(void)
+// {
+//   if (sockfd >= 0) {
+//     /* Send exactly what was typed w/ newline appended */
+//     input_line[input_len] = ' ';
+//     if (input_len > 0) {
+//       ssize_t sent = write(sockfd, input_line, input_len + 1);
+//       if (sent < 0) {
+//         printf("Message Send Failed. Error: %zd\n", sent);
+//       }
+//     }
+//   }
+
+//   /* Clear the input buffer */
+//   input_len = 0;
+//   cursor_pos = 0;
+//   input_line[0] = '\0';
+// }
+
 void *network_thread_f(void *ignored)
 {
-  /* network_thread_f
-     Receives data from the network, leaving the main program thread
-     to handle the USB keyboard. */
-  
   char recvBuf[BUFFER_SIZE];
   int n;
   int row = 8;
 
-  /* Receive data */
   while ( (n = read(sockfd, &recvBuf, BUFFER_SIZE - 1)) > 0 ) {
-    if (row == 8) {
-      // Rest entire input feed.
-      pthread_mutex_lock(&fb_mutex);
-      reset_rows(8, 12);
-      pthread_mutex_unlock(&fb_mutex);
-    }
-
     recvBuf[n] = '\0';
     printf("%s", recvBuf);
 
-    // Determine how many rows to output read buffer.
-    int row_count = (n + FB_COLS - 1) / FB_COLS;
+    // Figure out indent: if the line begins with "<...> " then indent continuations.
+    int indent = 0;
+    if (recvBuf[0] == '<') {
+      char *gt = strchr(recvBuf, '>');
+      if (gt != NULL) {
+        indent = (int)((gt - recvBuf) + 2); // "> " (space after >)
+        if (indent < 0) indent = 0;
+        if (indent > FB_COLS - 1) indent = FB_COLS - 1;
+      }
+    }
 
-   for (int i = 0; i < row_count; i++) {
-      // MUTEX THREAD Guard
+    // We will print using a "logical width":
+    // first row has FB_COLS columns,
+    // continuation rows have (FB_COLS - indent) columns because we start later.
+    int first_width = FB_COLS;
+    int cont_width  = FB_COLS - indent;
+    if (cont_width <= 0) cont_width = 1;
+
+    // Compute how many rows are needed with this indent rule.
+    int remaining = n;
+    int row_count = 0;
+    if (remaining > 0) {
+      // first row
+      remaining -= first_width;
+      row_count++;
+      // continuation rows
+      while (remaining > 0) {
+        remaining -= cont_width;
+        row_count++;
+      }
+    }
+
+    // If this message would overflow into the dashed-line/input region, wrap to top.
+    if (row + row_count >= FB_ROWS - 4) {
+      row = 8;
+    }
+
+    // Print rows
+    int offset = 0;
+    for (int i = 0; i < row_count; i++) {
       pthread_mutex_lock(&fb_mutex);
-      // Reset row before writing to it.
-      reset_rows(row + i, 1);
-      fbputs(&recvBuf[i * FB_COLS], row + i, 0); // Only write fraction of buffer that fits on the current row.
-      pthread_mutex_unlock(&fb_mutex);
-   }
-   row += row_count;  // advance past the rows we just used in our last write.
 
-   if (row >= FB_ROWS - 4) {
-      printf("CURR ROW: %d\n", row);
-      row = 8;  // wrap back to top of message area (FB_ROWS - 4 is the divide between the receipt and send regions / Row 8 is the top).
-   }
-}
+      reset_rows(row + i, 1);
+
+      int col_start = (i == 0) ? 0 : indent;
+      int width     = (i == 0) ? first_width : cont_width;
+
+      // Build substring for this row
+      char line[FB_COLS + 1];
+      int len = n - offset;
+      if (len > width) len = width;
+      if (len < 0) len = 0;
+
+      memcpy(line, &recvBuf[offset], len);
+
+      // Stop at newline if it exists in this chunk (don't turn it into spaces)
+      for (int k = 0; k < len; k++) {
+        if (line[k] == '\n' || line[k] == '\r') {
+          line[k] = '\0';
+          len = k;
+          break;
+        }
+      }
+
+      line[len] = '\0';
+      fbputs(line, row + i, col_start);
+
+      pthread_mutex_unlock(&fb_mutex);
+
+      offset += len;
+      if (offset >= n) break;
+    }
+
+    row += row_count;
+    if (row >= FB_ROWS - 4)
+      row = 8;
+  }
 
   return NULL;
 }
 
-/* Send the current input line to the server (followed by newline),
- * then clear the input line.
- */
-static void input_send_and_clear(void)
-{
-  if (sockfd >= 0) {
-    /* Send exactly what was typed w/ newline appended */
-    input_line[input_len] = ' ';
-    if (input_len > 0) {
-      ssize_t sent = write(sockfd, input_line, input_len + 1);
-      if (sent < 0) {
-        printf("Message Send Failed. Error: %zd\n", sent);
-      }
-    }
-  }
-
-  /* Clear the input buffer */
-  input_len = 0;
-  cursor_pos = 0;
-  input_line[0] = '\0';
-}
 
 // ================== USB KEYBOARD ==================
 
