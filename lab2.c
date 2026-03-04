@@ -154,15 +154,15 @@ void *network_thread_f(void *ignored)
   int n;
   int row = 8;
 
-  if (row == 8) {
-      // Rest entire input feed.
-      pthread_mutex_lock(&fb_mutex);
-      reset_rows(8, 14);
-      pthread_mutex_unlock(&fb_mutex);
-  }
-
   /* Receive data */
   while ( (n = read(sockfd, &recvBuf, BUFFER_SIZE - 1)) > 0 ) {
+    if (row == 8) {
+      // Rest entire input feed.
+      pthread_mutex_lock(&fb_mutex);
+      reset_rows(8, 12);
+      pthread_mutex_unlock(&fb_mutex);
+    }
+
     recvBuf[n] = '\0';
     printf("%s", recvBuf);
 
