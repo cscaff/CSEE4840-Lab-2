@@ -188,27 +188,27 @@ static void render_input_line(void)
 //   return NULL;
 // }
 
-// /* Send the current input line to the server (followed by newline),
-//  * then clear the input line.
-//  */
-// static void input_send_and_clear(void)
-// {
-//   if (sockfd >= 0) {
-//     /* Send exactly what was typed w/ newline appended */
-//     input_line[input_len] = ' ';
-//     if (input_len > 0) {
-//       ssize_t sent = write(sockfd, input_line, input_len + 1);
-//       if (sent < 0) {
-//         printf("Message Send Failed. Error: %zd\n", sent);
-//       }
-//     }
-//   }
+/* Send the current input line to the server (followed by newline),
+ * then clear the input line.
+ */
+static void input_send_and_clear(void)
+{
+  if (sockfd >= 0) {
+    /* Send exactly what was typed w/ newline appended */
+    input_line[input_len] = ' ';
+    if (input_len > 0) {
+      ssize_t sent = write(sockfd, input_line, input_len + 1);
+      if (sent < 0) {
+        printf("Message Send Failed. Error: %zd\n", sent);
+      }
+    }
+  }
 
-//   /* Clear the input buffer */
-//   input_len = 0;
-//   cursor_pos = 0;
-//   input_line[0] = '\0';
-// }
+  /* Clear the input buffer */
+  input_len = 0;
+  cursor_pos = 0;
+  input_line[0] = '\0';
+}
 
 void *network_thread_f(void *ignored)
 {
