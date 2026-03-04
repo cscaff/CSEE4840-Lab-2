@@ -220,10 +220,6 @@ void *network_thread_f(void *ignored)
     recvBuf[n] = '\0';
     printf("%s", recvBuf);
 
-    // Strip trailing newlines so they don't inflate row_count.
-    while (n > 0 && (recvBuf[n-1] == '\n' || recvBuf[n-1] == '\r'))
-      recvBuf[--n] = '\0';
-
     // Figure out indent: if the line begins with "<...> " then indent continuations.
     int indent = 0;
     if (recvBuf[0] == '<') {
@@ -300,7 +296,7 @@ void *network_thread_f(void *ignored)
 
       pthread_mutex_unlock(&fb_mutex);
 
-      offset += len;
+      offset += len + 1; /* +1 to skip past the newline/delimiter */
       if (offset >= n) break;
     }
 
