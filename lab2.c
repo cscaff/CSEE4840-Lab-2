@@ -37,8 +37,8 @@
 #define HID_KEY_DOWN       0x51
 #define HID_KEY_UP         0x52
 
-#define INPUT_ROW 22
-#define INPUT_COL_START 0
+#define INPUT_START_ROW (FB_ROWS - 3)  /* row 21, just below dashed divider */
+#define INPUT_MAX_ROWS 2               /* rows 21 and 22 available for input */
 
 /* Keep an input buffer for what the user is typing */
 static char input_line[BUFFER_SIZE];
@@ -108,33 +108,32 @@ void init_frame_buffer() {
  */
 static void render_input_line(void)
 {
-  int i;
-  int col = INPUT_COL_START;
+  int i, row, col;
 
-  // GUARD FRAME BUFFER WITH MUTEX LOCK
   pthread_mutex_lock(&fb_mutex);
 
-  /* Clear the whole input row first (inline — cannot call reset_rows here as it also locks fb_mutex) */
-  reset_rows(INPUT_ROW, 1); 
+  /* Clear both input rows */
+  for ( row = 0; row < INPUT_MAX_ROWS; row++)
+    for (col = 0; col < FB_COLS; col++)
+      fbputchar(' ', INPUT_START_ROW + row, col);
 
-  /* Draw the text */
-  for (i = 0; i < input_len && col < FB_COLS; i++, col++) {
-    fbputchar(input_line[i], INPUT_ROW, col);
+  /* Draw text, wrapping at FB_COLS. Taking Christian's row word wrap. */
+  for (i = 0; i < input_len; i++) {
+    row = INPUT_START_ROW + i / FB_COLS;
+    col = i % FB_COLS;
+    if (row >= INPUT_START_ROW + INPUT_MAX_ROWS) break;
+    fbputchar(input_line[i], row, col);
   }
 
-  /* Draw the cursor (underscore).
-   * If cursor goes past screen width, clamp it so we don't write off screen.
-   */
-  if (cursor_pos < 0) cursor_pos = 0;
-  if (cursor_pos > input_len) cursor_pos = input_len;
-
-  if (INPUT_COL_START + cursor_pos < FB_COLS) {
-    fbputchar('_', INPUT_ROW, INPUT_COL_START + cursor_pos);
+  /* Draw cursor */
+  if (cursor_pos >= 0 && cursor_pos <= input_len) {
+    row = INPUT_START_ROW + cursor_pos / FB_COLS;
+    col = cursor_pos % FB_COLS;
+    if (row < INPUT_START_ROW + INPUT_MAX_ROWS)
+      fbputchar('_', row, col);
   }
 
   pthread_mutex_unlock(&fb_mutex);
-  // GUARD FRAME BUFFER WITH MUTEX LOCK
-
 }
 
 // ================== NETWORKING ==================
