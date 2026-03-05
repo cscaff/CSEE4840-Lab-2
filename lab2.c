@@ -26,7 +26,7 @@
 #define SERVER_HOST "128.59.19.114"
 #define SERVER_PORT 42000
 
-#define BUFFER_SIZE 128
+#define BUFFER_SIZE 256
 
 /* Common HID keycodes (USB HID Usage ID for keyboard) */
 #define HID_KEY_ESC        0x29
@@ -195,7 +195,7 @@ static void input_send_and_clear(void)
 {
   if (sockfd >= 0) {
     /* Send exactly what was typed w/ newline appended */
-    input_line[input_len] = '\0';
+    input_line[input_len] = '\n';
     // DEBUG
     printf("Sending: \"%s\" (len=%d)\n", input_line, input_len);
     if (input_len > 0) {
