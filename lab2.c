@@ -231,7 +231,7 @@ void *network_thread_f(void *ignored)
     char *line_start = accumBuf;
     char *nl;
     // Scan bytes for \0 to terminate.
-    while ((nl = memchr(line_start, '\0', accumBuf + accumLen - line_start)) != NULL) {
+    while ((nl = memchr(line_start, '\n', accumBuf + accumLen - line_start)) != NULL) {
       n = (int)(nl - line_start);
       // Once we have our complete buffer, copy n bytes to the recvBuf for printing.
       memcpy(recvBuf, line_start, n);
