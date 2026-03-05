@@ -195,7 +195,7 @@ static void input_send_and_clear(void)
 {
   if (sockfd >= 0) {
     /* Send exactly what was typed w/ newline appended */
-    input_line[input_len] = ' ';
+    input_line[input_len] = '\n';
     if (input_len > 0) {
       ssize_t sent = write(sockfd, input_line, input_len + 1);
       if (sent < 0) {
@@ -221,7 +221,10 @@ void *network_thread_f(void *ignored)
   while ( (n = read(sockfd, accumBuf + accumLen, sizeof(accumBuf) - accumLen - 1)) > 0 ) {
     accumLen += n;
     accumBuf[accumLen] = '\0';
-    printf("%s", accumBuf + accumLen - n);
+    printf("read %d bytes: ", n);
+    for (int _i = accumLen - n; _i < accumLen; _i++)
+      printf("%02x ", (unsigned char)accumBuf[_i]);
+    printf("\n");
 
     char *line_start = accumBuf;
     char *nl;
