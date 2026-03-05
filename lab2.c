@@ -212,15 +212,27 @@ static void input_send_and_clear(void)
 
 void *network_thread_f(void *ignored)
 {
-  char recvBuf[BUFFER_SIZE];
+  static char accumBuf[BUFFER_SIZE * 4];  // persists between read() calls
+  static int  accumLen = 0;               // how many bytes are currently in it
+  char recvBuf[BUFFER_SIZE * 4];
   int n;
   int row = 8;
 
-  while ( (n = read(sockfd, &recvBuf, BUFFER_SIZE - 1)) > 0 ) {
-    recvBuf[n] = '\0';
-    printf("%s", recvBuf);
-    while (n > 0 && (recvBuf[n-1] == '\n' || recvBuf[n-1] == '\r'))
-        recvBuf[--n] = '\0';
+  while ( (n = read(sockfd, accumBuf + accumLen, sizeof(accumBuf) - accumLen - 1)) > 0 ) {
+    accumLen += n;
+    accumBuf[accumLen] = '\0';
+    printf("%s", accumBuf + accumLen - n);
+
+    char *line_start = accumBuf;
+    char *nl;
+    while ((nl = memchr(line_start, '\n', accumBuf + accumLen - line_start)) != NULL) {
+      n = (int)(nl - line_start);
+      memcpy(recvBuf, line_start, n);
+      recvBuf[n] = '\0';
+      line_start = nl + 1;
+
+      while (n > 0 && (recvBuf[n-1] == '\r'))
+          recvBuf[--n] = '\0';
 
     // Figure out indent: if the line begins with "<...> " then indent continuations.
     int indent = 0;
@@ -296,9 +308,13 @@ void *network_thread_f(void *ignored)
       if (offset >= n) break;
     }
 
-    row += row_count;
-    if (row >= FB_ROWS - 4)
-      row = 8;
+      row += row_count;
+      if (row >= FB_ROWS - 4)
+        row = 8;
+    } // end inner while (complete messages)
+
+    accumLen = (int)(accumBuf + accumLen - line_start);
+    memmove(accumBuf, line_start, accumLen);
   }
 
   return NULL;
