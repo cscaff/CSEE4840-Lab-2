@@ -195,7 +195,7 @@ static void input_send_and_clear(void)
 {
   if (sockfd >= 0) {
     /* Send exactly what was typed w/ newline appended */
-    input_line[input_len] = '\n';
+    input_line[input_len] = '\0';
     if (input_len > 0) {
       ssize_t sent = write(sockfd, input_line, input_len + 1);
       if (sent < 0) {
@@ -212,28 +212,33 @@ static void input_send_and_clear(void)
 
 void *network_thread_f(void *ignored)
 {
-  static char accumBuf[BUFFER_SIZE * 4];  // persists between read() calls
+  static char accumBuf[BUFFER_SIZE * 4];  // Accumulate Bytes across Read Calls.
   static int  accumLen = 0;               // how many bytes are currently in it
-  char recvBuf[BUFFER_SIZE * 4];
+  char recvBuf[BUFFER_SIZE];
   int n;
   int row = 8;
 
   while ( (n = read(sockfd, accumBuf + accumLen, sizeof(accumBuf) - accumLen - 1)) > 0 ) {
+    // We read and add bytes to the current aaccumulated buffer, checking for a \n to consider finished.
     accumLen += n;
-    accumBuf[accumLen] = '\0';
-    printf("read %d bytes: ", n);
+    accumBuf[accumLen] = '\0'; // Add our null terminator to become a string,
+    printf("read %d bytes: ", n); // DEBUGGING
     for (int _i = accumLen - n; _i < accumLen; _i++)
       printf("%02x ", (unsigned char)accumBuf[_i]);
     printf("\n");
 
+    // Pointer to the start of the accumulation buffer.
     char *line_start = accumBuf;
     char *nl;
-    while ((nl = memchr(line_start, '\n', accumBuf + accumLen - line_start)) != NULL) {
+    // Scan bytes for \0 to terminate.
+    while ((nl = memchr(line_start, '\0', accumBuf + accumLen - line_start)) != NULL) {
       n = (int)(nl - line_start);
+      // Once we have our complete buffer, copy n bytes to the recvBuf for printing.
       memcpy(recvBuf, line_start, n);
-      recvBuf[n] = '\0';
+      recvBuf[n] = '\0'; // Unsure if we still need this if we are expecting \0.
       line_start = nl + 1;
 
+      //  Trim trailing \r if present (some clients may send \r\n for newline).
       while (n > 0 && (recvBuf[n-1] == '\r'))
           recvBuf[--n] = '\0';
 
