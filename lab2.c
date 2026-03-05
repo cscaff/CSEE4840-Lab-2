@@ -234,6 +234,8 @@ void *network_thread_f(void *ignored)
       while (n > 0 && (recvBuf[n-1] == '\r'))
           recvBuf[--n] = '\0';
 
+      printf("recv: %s\n", recvBuf);
+
     // Figure out indent: if the line begins with "<...> " then indent continuations.
     int indent = 0;
     if (recvBuf[0] == '<') {
