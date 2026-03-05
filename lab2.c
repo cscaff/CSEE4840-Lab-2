@@ -233,80 +233,83 @@ void *network_thread_f(void *ignored)
       recvBuf[n] = '\0';
       line_start = nl + 1; // advance past '\n' for next iteration
 
-      // Strip trailing \r
-      while (n > 0 && (recvBuf[n-1] == '\n' || recvBuf[n-1] == '\r'))
-          recvBuf[--n] = '\0';
+    // Strip trailing \r (recvBuf[n] is already '\0', so walk back from n-1)
+    while (n > 0 && (recvBuf[n-1] == '\n' || recvBuf[n-1] == '\r'))
+        recvBuf[--n] = '\0';
 
-      // Figure out indent: if the line begins with "<...> " then indent continuations.
-      int indent = 0;
-      if (recvBuf[0] == '<') {
-        char *gt = strchr(recvBuf, '>');
-        if (gt != NULL) {
-          indent = (int)((gt - recvBuf) + 2); // "> " (space after >)
-          if (indent < 0) indent = 0;
-          if (indent > FB_COLS - 1) indent = FB_COLS - 1;
-        }
+    // Figure out indent: if the line begins with "<...> " then indent continuations.
+    int indent = 0;
+    if (recvBuf[0] == '<') {
+      char *gt = strchr(recvBuf, '>');
+      if (gt != NULL) {
+        indent = (int)((gt - recvBuf) + 2); // "> " (space after >)
+        if (indent < 0) indent = 0;
+        if (indent > FB_COLS - 1) indent = FB_COLS - 1;
       }
+    }
 
-      // We will print using a "logical width":
-      // first row has FB_COLS columns,
-      // continuation rows have (FB_COLS - indent) columns because we start later.
-      int first_width = FB_COLS;
-      int cont_width  = FB_COLS - indent;
-      if (cont_width <= 0) cont_width = 1;
+    // We will print using a "logical width":
+    // first row has FB_COLS columns,
+    // continuation rows have (FB_COLS - indent) columns because we start later.
+    int first_width = FB_COLS;
+    int cont_width  = FB_COLS - indent;
+    if (cont_width <= 0) cont_width = 1;
 
-      // Compute how many rows are needed with this indent rule.
-      int remaining = n;
-      int row_count = 0;
-      if (remaining > 0) {
-        // first row
-        remaining -= first_width;
+    // Compute how many rows are needed with this indent rule.
+    int remaining = n;
+    int row_count = 0;
+    if (remaining > 0) {
+      // first row
+      remaining -= first_width;
+      row_count++;
+      // continuation rows
+      while (remaining > 0) {
+        remaining -= cont_width;
         row_count++;
-        // continuation rows
-        while (remaining > 0) {
-          remaining -= cont_width;
-          row_count++;
-        }
       }
+    }
 
-      // If this message would overflow into the dashed-line/input region, wrap to top.
-      if (row + row_count >= FB_ROWS - 4) {
-        row = 8;
-      }
+    // If this message would overflow into the dashed-line/input region, wrap to top.
+    if (row + row_count >= FB_ROWS - 4) {
+      row = 8;
+    }
 
-      // Clear the message area when wrapping back to the top.
-      if (row == 8) {
-        pthread_mutex_lock(&fb_mutex);
-        reset_rows(8, 12);
-        pthread_mutex_unlock(&fb_mutex);
-      }
+    // Clear the message area when wrapping back to the top.
+    if (row == 8) {
+      pthread_mutex_lock(&fb_mutex);
+      reset_rows(8, 12);
+      pthread_mutex_unlock(&fb_mutex);
+    }
 
-      // Print rows
-      int offset = 0;
-      for (int i = 0; i < row_count; i++) {
-        pthread_mutex_lock(&fb_mutex);
+    // Print rows
+    int offset = 0;
+    for (int i = 0; i < row_count; i++) {
+      pthread_mutex_lock(&fb_mutex);
 
-        reset_rows(row + i, 1);
+      reset_rows(row + i, 1);
 
-        int col_start = (i == 0) ? 0 : indent;
-        int width     = (i == 0) ? first_width : cont_width;
+      int col_start = (i == 0) ? 0 : indent;
+      int width     = (i == 0) ? first_width : cont_width;
 
-        // Build substring for this row
-        char line[FB_COLS + 1];
-        int len = n - offset;
-        if (len > width) len = width;
-        if (len < 0) len = 0;
+      // DEBUG
+      printf("ROW %d: col_start=%d width=%d offset=%d remaining=%d\n", row + i, col_start, width, offset, n - offset);
 
-        memcpy(line, &recvBuf[offset], len);
+      // Build substring for this row
+      char line[FB_COLS + 1];
+      int len = n - offset;
+      if (len > width) len = width;
+      if (len < 0) len = 0;
 
-        line[len] = '\0';
-        fbputs(line, row + i, col_start);
+      memcpy(line, &recvBuf[offset], len);
 
-        pthread_mutex_unlock(&fb_mutex);
+      line[len] = '\0';
+      fbputs(line, row + i, col_start);
 
-        offset += len;
-        if (offset >= n) break;
-      }
+      pthread_mutex_unlock(&fb_mutex);
+
+      offset += len;
+      if (offset >= n) break;
+    }
 
       row += row_count;
       if (row >= FB_ROWS - 4)
