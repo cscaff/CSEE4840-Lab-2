@@ -212,28 +212,13 @@ static void input_send_and_clear(void)
 
 void *network_thread_f(void *ignored)
 {
-  static char accumBuf[BUFFER_SIZE * 4]; // holds bytes across read() calls
-  static int  accumLen = 0;              // how many bytes are buffered
-  char recvBuf[BUFFER_SIZE * 4];        // one complete message per loop iteration
+  char recvBuf[BUFFER_SIZE];
   int n;
   int row = 8;
 
-  while ( (n = read(sockfd, accumBuf + accumLen, (int)sizeof(accumBuf) - accumLen - 1)) > 0 ) {
-    accumLen += n;
-    accumBuf[accumLen] = '\0';
-    printf("%s", accumBuf + accumLen - n);
-
-    // Process every complete (newline-terminated) message in the accumulator.
-    char *line_start = accumBuf;
-    char *nl;
-    while ((nl = memchr(line_start, '\n', accumBuf + accumLen - line_start)) != NULL) {
-      // Copy the complete message into recvBuf so the rest of the loop is unchanged.
-      n = (int)(nl - line_start);
-      memcpy(recvBuf, line_start, n);
-      recvBuf[n] = '\0';
-      line_start = nl + 1; // advance past '\n' for next iteration
-
-    // Strip trailing \r (recvBuf[n] is already '\0', so walk back from n-1)
+  while ( (n = read(sockfd, &recvBuf, BUFFER_SIZE - 1)) > 0 ) {
+    recvBuf[n] = '\0';
+    printf("%s", recvBuf);
     while (n > 0 && (recvBuf[n-1] == '\n' || recvBuf[n-1] == '\r'))
         recvBuf[--n] = '\0';
 
@@ -311,15 +296,10 @@ void *network_thread_f(void *ignored)
       if (offset >= n) break;
     }
 
-      row += row_count;
-      if (row >= FB_ROWS - 4)
-        row = 8;
-    } // end inner while (complete messages)
-
-    // Keep any partial (incomplete) message at the front of accumBuf.
-    accumLen = (int)(accumBuf + accumLen - line_start);
-    memmove(accumBuf, line_start, accumLen);
-  } // end outer while (read)
+    row += row_count;
+    if (row >= FB_ROWS - 4)
+      row = 8;
+  }
 
   return NULL;
 }
